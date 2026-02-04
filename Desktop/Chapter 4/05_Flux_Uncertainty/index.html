@@ -216,6 +216,12 @@
         <button class="tab-button" onclick="showTab('ddm30coastal')">
             🏖️ DDM30 Coastal
         </button>
+        <button class="tab-button" onclick="showTab('mip')">
+            💧 MIP Input
+        </button>
+        <button class="tab-button" onclick="showTab('retention')">
+            📊 Retention
+        </button>
     </div>
 
     <div class="content-area">
@@ -281,6 +287,16 @@
             <div class="loading">Loading DDM30 Coastal...</div>
             <iframe id="ddm30coastalFrame" src=""></iframe>
         </div>
+
+        <div id="mip" class="tab-content">
+            <div class="loading">Loading MIP Data...</div>
+            <iframe id="mipFrame" src=""></iframe>
+        </div>
+
+        <div id="retention" class="tab-content">
+            <div class="loading">Loading Retention Analysis...</div>
+            <iframe id="retentionFrame" src=""></iframe>
+        </div>
     </div>
 
     <script>
@@ -307,7 +323,9 @@
                 'lev12all': 'Dashboard_Lev12_All.html',
                 'lev12coastal': 'Dashboard_Lev12_Coastal.html',
                 'ddm30all': 'Dashboard_DDM30_All.html',
-                'ddm30coastal': 'Dashboard_DDM30_Coastal.html'
+                'ddm30coastal': 'Dashboard_DDM30_Coastal.html',
+                'mip': 'Dashboard_MIP.html',
+                'retention': 'Dashboard_Retention.html'
             };
 
             if (frameMap[tabName] && !loadedFrames[tabName]) {
@@ -324,7 +342,7 @@
 
         // Disable cache for iframes
         window.addEventListener('beforeunload', function () {
-            ['lev12all', 'lev12coastal', 'ddm30all', 'ddm30coastal'].forEach(id => {
+            ['lev12all', 'lev12coastal', 'ddm30all', 'ddm30coastal', 'mip', 'retention'].forEach(id => {
                 const frame = document.getElementById(`${id}Frame`);
                 if (frame) frame.src = '';
             });

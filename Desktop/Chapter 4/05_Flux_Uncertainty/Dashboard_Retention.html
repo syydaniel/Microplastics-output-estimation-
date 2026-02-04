@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retention Rate Analysis - DDM30 Basins</title>
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Data -->
+    <script src="retention_data_ddm30.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f0f2f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            font-size: 0.9em;
+            color: #e0e0e0;
+        }
+
+        .content-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+
+        .stats-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stats-panel h3 {
+            font-size: 0.95em;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 0.85em;
+        }
+
+        .metric-val {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-container {
+            height: 250px;
+            background: white;
+            border-top: 2px solid #e0e0e0;
+            padding: 10px;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            min-width: 200px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>Retention Rate Analysis</h1>
+        <div class="subtitle">DDM30 Basins - MIP Input vs Flux Output</div>
+    </div>
+
+    <div class="content-wrapper">
+        <div class="sidebar">
+            <div class="stats-panel">
+                <h3>Global Statistics</h3>
+                <div class="metric-row">
+                    <span>Total Basins:</span>
+                    <span class="metric-val" id="totalBasins">-</span>
+                </div>
+                <div class="metric-row">
+                    <span>Mean Retention:</span>
+                    <span class="metric-val" id="meanRetention">-</span>
+                </div>
+                <div class="metric-row">
+                    <span>Median Retention:</span>
+                    <span class="metric-val" id="medianRetention">-</span>
+                </div>
+                <div class="metric-row">
+                    <span>P25 - P75:</span>
+                    <span class="metric-val" id="p25p75">-</span>
+                </div>
+            </div>
+
+            <div class="stats-panel">
+                <h3>Mass Balance</h3>
+                <div class="metric-row">
+                    <span>Total MIP Input:</span>
+                    <span class="metric-val" id="totalMIP">-</span>
+                </div>
+                <div class="metric-row">
+                    <span>Total Flux Output:</span>
+                    <span class="metric-val" id="totalFlux">-</span>
+                </div>
+                <div class="metric-row">
+                    <span>Net Retained:</span>
+                    <span class="metric-val" id="totalRetained">-</span>
+                </div>
+            </div>
+
+            <div class="stats-panel">
+                <h3>About Retention Rate</h3>
+                <div style="font-size:0.8em; line-height:1.4; color:#555;">
+                    <p style="margin-bottom:8px;">
+                        <b>Formula:</b><br>
+                        Retention = (MIP_Input - Flux_Output) / MIP_Input × 100%
+                    </p>
+                    <p style="margin-bottom:8px;">
+                        <b>Interpretation:</b><br>
+                        • Positive: Basin retains microplastics<br>
+                        • Negative: Output exceeds MIP sewage input (other sources present)
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-area">
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="legend">
+                    <h4 style="margin-bottom:10px; color:#2c3e50; font-size:0.95em;">Retention Rate</h4>
+                    <div id="legendContent"></div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div id="distributionChart" style="height:100%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map = null;
+        let mapLayer = null;
+
+        function initMap() {
+            map = L.map('map').setView([20, 0], 2);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO'
+            }).addTo(map);
+            L.control.scale().addTo(map);
+        }
+
+        function updateMap() {
+            if (!map || !window.RETENTION_DATA_DDM30) return;
+            if (mapLayer) map.removeLayer(mapLayer);
+
+            const basins = window.RETENTION_DATA_DDM30.basins;
+            const vals = basins.map(b => b.retention_rate);
+            const minVal = Math.min(...vals);
+            const maxVal = Math.max(...vals);
+
+            function getColor(rate) {
+                // Green for positive (retention), Red for negative (loss)
+                if (rate >= 0) {
+                    const t = Math.min(rate / 100, 1);
+                    return `hsl(120, ${50 + t * 50}%, ${50 - t * 30}%)`;
+                } else {
+                    const t = Math.min(Math.abs(rate) / 1000, 1);
+                    return `hsl(0, ${50 + t * 50}%, ${50 - t * 30}%)`;
+                }
+            }
+
+            mapLayer = L.layerGroup();
+
+            basins.forEach(b => {
+                L.circleMarker([b.lat, b.lon], {
+                    radius: 4,
+                    fillColor: getColor(b.retention_rate),
+                    color: "#000",
+                    weight: 0.5,
+                    opacity: 1,
+                    fillOpacity: 0.7
+                }).bindPopup(`
+                    <b>Basin ID:</b> ${b.id}<br>
+                    <b>MIP Input:</b> ${b.mip_input.toExponential(2)} items/yr<br>
+                    <b>Flux Output:</b> ${b.flux_output.toExponential(2)} items/yr<br>
+                    <b>Retention Rate:</b> ${b.retention_rate.toFixed(2)}%<br>
+                    <b>Net Retained:</b> ${b.retention_mass.toExponential(2)} items/yr
+                `).addTo(mapLayer);
+            });
+
+            mapLayer.addTo(map);
+            updateLegend();
+        }
+
+        function updateLegend() {
+            const div = document.getElementById('legendContent');
+            let html = `<div style="margin-bottom:8px;">
+                <div style="display:flex; align-items:center; margin-bottom:5px;">
+                    <div style="width:20px; height:20px; background:hsl(120,100%,35%); margin-right:8px; border:1px solid #000;"></div>
+                    <span style="font-size:0.85em;">High Retention (+)</span>
+                </div>
+                <div style="display:flex; align-items:center; margin-bottom:5px;">
+                    <div style="width:20px; height:20px; background:hsl(60,70%,50%); margin-right:8px; border:1px solid #000;"></div>
+                    <span style="font-size:0.85em;">Neutral (0%)</span>
+                </div>
+                <div style="display:flex; align-items:center;">
+                    <div style="width:20px; height:20px; background:hsl(0,100%,35%); margin-right:8px; border:1px solid #000;"></div>
+                    <span style="font-size:0.85em;">High Loss (-)</span>
+                </div>
+            </div>`;
+            div.innerHTML = html;
+        }
+
+        function updateStats() {
+            if (!window.RETENTION_DATA_DDM30) return;
+            const data = window.RETENTION_DATA_DDM30;
+            document.getElementById('totalBasins').textContent = data.total_basins.toLocaleString();
+            document.getElementById('meanRetention').textContent = data.mean_retention.toFixed(2) + '%';
+            document.getElementById('medianRetention').textContent = data.median_retention.toFixed(2) + '%';
+            document.getElementById('p25p75').textContent = `${data.p25_retention.toFixed(2)}% - ${data.p75_retention.toFixed(2)}%`;
+            document.getElementById('totalMIP').textContent = data.total_mip_input.toExponential(2);
+            document.getElementById('totalFlux').textContent = data.total_flux_output.toExponential(2);
+            document.getElementById('totalRetained').textContent = data.total_retained.toExponential(2);
+        }
+
+        function plotDistribution() {
+            if (!window.RETENTION_DATA_DDM30) return;
+            const dist = window.RETENTION_DATA_DDM30.distribution;
+
+            // Create bin labels
+            const binLabels = dist.bins.slice(0, -1).map((b, i) => `${b} to ${dist.bins[i + 1]}%`);
+
+            const trace = {
+                x: binLabels,
+                y: dist.counts,
+                type: 'bar',
+                marker: {
+                    color: '#667eea',
+                    line: { color: '#4a5bb8', width: 1 }
+                }
+            };
+
+            const layout = {
+                title: 'Retention Rate Distribution',
+                xaxis: { title: 'Retention Rate (%)' },
+                yaxis: { title: 'Number of Basins' },
+                margin: { t: 40, b: 60, l: 50, r: 20 },
+                font: { size: 11 }
+            };
+
+            Plotly.newPlot('distributionChart', [trace], layout, { displayModeBar: false });
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            initMap();
+            updateStats();
+            updateMap();
+            plotDistribution();
+        });
+    </script>
+</body>
+
+</html>
