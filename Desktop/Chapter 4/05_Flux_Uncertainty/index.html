@@ -204,11 +204,17 @@
         <button class="tab-button active" onclick="showTab('welcome')">
             🏠 Home
         </button>
-        <button class="tab-button" onclick="showTab('dashboard')">
-            📊 Interactive Dashboard
+        <button class="tab-button" onclick="showTab('lev12all')">
+            📍 Level 12 All
         </button>
-        <button class="tab-button" onclick="showTab('ddm30')">
-            🌍 DDM30 Analysis
+        <button class="tab-button" onclick="showTab('lev12coastal')">
+            🌊 Level 12 Coastal
+        </button>
+        <button class="tab-button" onclick="showTab('ddm30all')">
+            🗺️ DDM30 All
+        </button>
+        <button class="tab-button" onclick="showTab('ddm30coastal')">
+            🏖️ DDM30 Coastal
         </button>
     </div>
 
@@ -256,30 +262,37 @@
             </div>
         </div>
 
-        <div id="dashboard" class="tab-content">
-            <div class="loading">Loading dashboard...</div>
-            <iframe id="dashboardFrame" src=""></iframe>
+        <div id="lev12all" class="tab-content">
+            <div class="loading">Loading Level 12 All Basins...</div>
+            <iframe id="lev12allFrame" src=""></iframe>
         </div>
 
-        <div id="ddm30" class="tab-content">
-            <div class="loading">Loading DDM30 dashboard...</div>
-            <iframe id="ddm30Frame" src=""></iframe>
+        <div id="lev12coastal" class="tab-content">
+            <div class="loading">Loading Level 12 Coastal...</div>
+            <iframe id="lev12coastalFrame" src=""></iframe>
+        </div>
+
+        <div id="ddm30all" class="tab-content">
+            <div class="loading">Loading DDM30 All Basins...</div>
+            <iframe id="ddm30allFrame" src=""></iframe>
+        </div>
+
+        <div id="ddm30coastal" class="tab-content">
+            <div class="loading">Loading DDM30 Coastal...</div>
+            <iframe id="ddm30coastalFrame" src=""></iframe>
         </div>
     </div>
 
     <script>
-        let dashboardLoaded = false;
-        let ddm30Loaded = false;
+        let loadedFrames = {};
 
         function showTab(tabName) {
             // Update tab buttons
             const buttons = document.querySelectorAll('.tab-button');
             buttons.forEach(btn => btn.classList.remove('active'));
-            // If called from a tab button (not a card), highlight it
-            if (event.target.classList.contains('tab-button')) {
+            if (event && event.target.classList.contains('tab-button')) {
                 event.target.classList.add('active');
             } else {
-                // If called from a card, find the corresponding tab button
                 const btn = Array.from(buttons).find(b => b.getAttribute('onclick').includes(tabName));
                 if (btn) btn.classList.add('active');
             }
@@ -290,36 +303,31 @@
             document.getElementById(tabName).classList.add('active');
 
             // Lazy load iframe
-            if (tabName === 'dashboard' && !dashboardLoaded) {
-                const loading = document.querySelector('#dashboard .loading');
-                loading.style.display = 'block';
-                const iframe = document.getElementById('dashboardFrame');
-                iframe.src = 'Integrated_Flux_Dashboard.html';
-                iframe.onload = () => {
-                    loading.style.display = 'none';
-                    dashboardLoaded = true;
-                };
-                iframe.onload = () => {
-                    loading.style.display = 'none';
-                    dashboardLoaded = true;
-                };
-            }
+            const frameMap = {
+                'lev12all': 'Dashboard_Lev12_All.html',
+                'lev12coastal': 'Dashboard_Lev12_Coastal.html',
+                'ddm30all': 'Dashboard_DDM30_All.html',
+                'ddm30coastal': 'Dashboard_DDM30_Coastal.html'
+            };
 
-            if (tabName === 'ddm30' && !ddm30Loaded) {
-                const loading = document.querySelector('#ddm30 .loading');
+            if (frameMap[tabName] && !loadedFrames[tabName]) {
+                const loading = document.querySelector(`#${tabName} .loading`);
                 loading.style.display = 'block';
-                const iframe = document.getElementById('ddm30Frame');
-                iframe.src = 'DDM30_Flux_Dashboard.html';
+                const iframe = document.getElementById(`${tabName}Frame`);
+                iframe.src = frameMap[tabName];
                 iframe.onload = () => {
                     loading.style.display = 'none';
-                    ddm30Loaded = true;
+                    loadedFrames[tabName] = true;
                 };
             }
         }
 
         // Disable cache for iframes
         window.addEventListener('beforeunload', function () {
-            document.getElementById('dashboardFrame').src = '';
+            ['lev12all', 'lev12coastal', 'ddm30all', 'ddm30coastal'].forEach(id => {
+                const frame = document.getElementById(`${id}Frame`);
+                if (frame) frame.src = '';
+            });
         });
     </script>
 </body>

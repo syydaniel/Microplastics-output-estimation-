@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Level 12 All Basins - Flux Explorer</title>
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Data -->
+    <script src="all_basins_lev12.js"></script>
+    <script>
+        if (typeof ALL_BASINS_LEV12 !== 'undefined') {
+            window.COASTAL_DATA = ALL_BASINS_LEV12;
+        }
+    </script>
+    <!-- CSS -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            height: 100vh;
+            background: #f0f2f5;
+            overflow: hidden;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: 350px;
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .sidebar h1 {
+            font-size: 1.4em;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .sidebar .subtitle {
+            font-size: 0.85em;
+            color: #bdc3c7;
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .control-item {
+            margin-bottom: 15px;
+        }
+
+        .control-item label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .control-item input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .value-display {
+            font-weight: bold;
+            color: #f1c40f;
+        }
+
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 8px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-conservative {
+            background: #34495e;
+            color: white;
+        }
+
+        .btn-median {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .btn-optimistic {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-reset {
+            background: #f39c12;
+            color: white;
+        }
+
+        .results-panel {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: auto;
+        }
+
+        .results-panel h3 {
+            font-size: 1em;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 5px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .metric-val {
+            font-weight: bold;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: white;
+            padding: 0 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-btn {
+            padding: 15px 25px;
+            border: none;
+            background: none;
+            font-size: 1em;
+            color: #7f8c8d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            color: #2c3e50;
+        }
+
+        .tab-btn.active {
+            color: #3498db;
+            border-bottom: 3px solid #3498db;
+        }
+
+        .tab-content {
+            flex: 1;
+            position: relative;
+            display: none;
+            padding: 0;
+            overflow: auto;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Map Specific */
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            width: 250px;
+        }
+
+        .info {
+            padding: 6px 8px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+
+        .legend {
+            line-height: 18px;
+            color: #555;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+
+        /* Analysis Panel Grid */
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            height: 350px;
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 60%;
+            /* Offset because of sidebar */
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            z-index: 9999;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h1>Level 12 All Basins</h1>
+        <div class="subtitle">~894k HydroBASINS Level 12</div>
+
+        <div class="preset-buttons">
+            <button class="btn btn-conservative" onclick="applyPreset('conservative')">Conservative</button>
+            <button class="btn btn-median" onclick="applyPreset('median')">Median</button>
+            <button class="btn btn-optimistic" onclick="applyPreset('optimistic')">Optimistic</button>
+            <button class="btn btn-reset" onclick="applyPreset('median')">Reset</button>
+        </div>
+
+        <div class="control-group">
+            <h4 style="margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:5px;">
+                Simulation Parameters</h4>
+
+            <div class="control-item">
+                <label>
+                    Size Exponent (α)
+                    <span id="alphaValue" class="value-display">2.64</span>
+                </label>
+                <input type="range" id="alphaSlider" min="1.5" max="4.0" step="0.1" value="2.64">
+            </div>
+
+            <div class="control-item">
+                <label>
+                    Min Size (μm)
+                    <span id="minSizeValue" class="value-display">100</span>
+                </label>
+                <input type="range" id="minSizeSlider" min="10" max="500" step="10" value="100">
+            </div>
+
+            <div class="control-item">
+                <label>
+                    MC Samples
+                    <span id="mcSamplesValue" class="value-display">3000</span>
+                </label>
+                <input type="range" id="mcSamplesSlider" min="1000" max="10000" step="500" value="3000">
+            </div>
+
+            <div class="control-item">
+                <label>
+                    Scenario Year
+                    <span id="yearValue" class="value-display" style="color:#e67e22">2020</span>
+                </label>
+                <input type="range" id="yearSlider" min="2010" max="2025" step="1" value="2020">
+                <div style="font-size:0.75em; color:#bdc3c7; margin-top:5px;">
+                    * Assumes doubling every 11 years (Base: 2020)
+                </div>
+            </div>
+        </div>
+
+        <div class="results-panel">
+            <h3>Global Results (Calculated)</h3>
+            <div class="metric-row">
+                <span>Mean Particle Mass:</span>
+                <span class="metric-val" id="resMeanMass">-</span>
+            </div>
+            <div class="metric-row">
+                <span>Total Mass Flux (P50):</span>
+                <span class="metric-val" id="resTotalFlux">-</span>
+            </div>
+            <div class="metric-row">
+                <span>Total Item Flux (Static):</span>
+                <span class="metric-val" id="resTotalItems">-</span>
+            </div>
+            <div style="font-size:0.8em; margin-top:10px; color:#bdc3c7;">
+                * Map updates automatically based on these values.
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('map')">🌍 Interactive Map</button>
+            <button class="tab-btn" onclick="switchTab('analysis')">📊 Detailed Analysis</button>
+            <button class="tab-btn" onclick="switchTab('surface')">🗻 3D Surface Explorer</button>
+        </div>
+
+        <!-- TAB 1: MAP -->
+        <div id="tab-map" class="tab-content active">
+            <div id="map"></div>
+
+            <div class="map-controls">
+                <h4 style="margin-bottom:10px; color:#2c3e50;">Map Layers</h4>
+                <div style="margin-bottom:15px;">
+                    <label
+                        style="display:block; font-weight:bold; color:#7f8c8d; font-size:0.9em; margin-bottom:5px;">Metric:</label>
+                    <select id="mapMetricSelect"
+                        style="width:100%; padding:5px; border-radius:5px; border:1px solid #ccc;">
+                        <option value="mass">Mass Flux (Dynamic Simulation)</option>
+                        <option value="items">Item Flux (Static Inventory)</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:15px;">
+                    <label
+                        style="display:block; font-weight:bold; color:#7f8c8d; font-size:0.9em; margin-bottom:5px;">Marker
+                        Radius:</label>
+                    <input type="range" id="mapRadiusSlider" min="1" max="10" step="0.5" value="3" style="width:100%;">
+                </div>
+                <div style="font-size:0.85em; color:#95a5a6;">
+                    Total Basins: <span id="mapCount">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: ANALYSIS -->
+        <div id="tab-analysis" class="tab-content">
+            <div class="analysis-grid">
+                <div class="chart-card">
+                    <h3>Size Distribution (Power Law)</h3>
+                    <div id="sizeChart" style="height:300px;"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Flux Estimate Convergence</h3>
+                    <div id="convergenceChart" style="height:300px;"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Particle Mass Histogram</h3>
+                    <div id="massChart" style="height:300px;"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Polymer Composition</h3>
+                    <div id="polymerChart" style="height:300px;"></div>
+                </div>
+            </div>
+
+            <div class="analysis-grid" style="grid-template-columns: 1fr;"> <!-- Full width for trend -->
+                <div class="chart-card">
+                    <h3>📈 Temporal Trend (Exponential Growth)</h3>
+                    <div id="trendChart" style="height:300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: SURFACE -->
+        <div id="tab-surface" class="tab-content">
+            <div style="height: calc(100vh - 100px); padding: 10px;">
+                <iframe src="Surface_Explorer_3D.html"
+                    style="width:100%; height:100%; border:none; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.1);"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading">Updating Simulation & Map...</div>
+
+    <script>
+        // --- 1. CONFIGURATION & DATA ---
+        const DENSITIES = { 'Fiber': 0.95, 'Fragment': 1.20, 'Pellet': 1.15, 'Film': 0.92 };
+        const SHAPE_PROBS = { 'Fiber': 0.589, 'Fragment': 0.300, 'Pellet': 0.036, 'Film': 0.075 };
+        const POLYMER_PROBS = { 'PE': 0.332, 'PP': 0.270, 'PS': 0.085, 'PET': 0.138, 'PVC': 0.026, 'PA': 0.149 };
+
+        const PRESETS = {
+            conservative: { alpha: 3.0, minSize: 50, mcSamples: 5000 },
+            median: { alpha: 2.64, minSize: 100, mcSamples: 3000 },
+            optimistic: { alpha: 2.2, minSize: 200, mcSamples: 5000 }
+        };
+
+        const DOUBLING_TIME = 11; // Years
+        const BASE_YEAR = 2020;   // Midpoint of 2016-2025
+
+        // --- 2. STATE MANAGEMENT ---
+        let currentSimulationResult = null;
+        let map = null;
+        let mapLayer = null;
+        let legend = null;
+
+        // --- 3. MONTE CARLO SIMULATION LOGIC ---
+        function sampleSizes(n, alpha, minUm, maxUm) {
+            const samples = [];
+            for (let i = 0; i < n; i++) {
+                const u = Math.random();
+                if (Math.abs(alpha - 1.0) < 0.01) { // alpha approx 1
+                    samples.push(minUm * Math.pow(maxUm / minUm, u));
+                } else {
+                    const term1 = Math.pow(maxUm, 1 - alpha);
+                    const term2 = Math.pow(minUm, 1 - alpha);
+                    samples.push(Math.pow((term1 - term2) * u + term2, 1 / (1 - alpha)));
+                }
+            }
+            return samples;
+        }
+
+        function calculateVolume(size, shape) {
+            if (shape === 'Fiber') {
+                const L = size;
+                const D = L / 10;
+                return Math.PI * Math.pow(D / 2, 2) * L;
+            } else if (shape === 'Fragment' || shape === 'Pellet') {
+                return (4 / 3) * Math.PI * Math.pow(size / 2, 3);
+            } else { // Film
+                return Math.pow(size, 2) * 20;
+            }
+        }
+
+        function sampleFromDist(probs) {
+            const keys = Object.keys(probs);
+            const values = Object.values(probs);
+            const u = Math.random();
+            let cumsum = 0;
+            for (let i = 0; i < keys.length; i++) {
+                cumsum += values[i];
+                if (u <= cumsum) return keys[i];
+            }
+            return keys[keys.length - 1]; // Fallback
+        }
+
+        function runSimulation() {
+            const alpha = parseFloat(document.getElementById('alphaSlider').value);
+            const minSize = parseFloat(document.getElementById('minSizeSlider').value);
+            const mcSamples = parseInt(document.getElementById('mcSamplesSlider').value);
+            const selectedYear = parseInt(document.getElementById('yearSlider').value);
+            const nIterations = 100; // Reduced for interactivity speed, but enough for mean stability
+
+            // Calculate Time Scaling Factor
+            // Flux(t) = Flux(base) * 2 ^ ((t - t_base) / 11)
+            const timeScalingFactor = Math.pow(2, (selectedYear - BASE_YEAR) / DOUBLING_TIME);
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+
+            // Use setTimeout to allow UI to render loading state
+            setTimeout(() => {
+                const fluxEstimates = [];
+                let allMasses = []; // For histogram from last iter
+                let meanMassAccumulator = 0;
+
+                for (let iter = 0; iter < nIterations; iter++) {
+                    const sizes = sampleSizes(mcSamples, alpha, minSize, 5000); // Max size 5mm fixed
+                    const masses = [];
+
+                    for (let i = 0; i < mcSamples; i++) {
+                        const shape = sampleFromDist(SHAPE_PROBS);
+                        const volume = calculateVolume(sizes[i], shape);
+                        const density = DENSITIES[shape] || 1.0;
+                        const mass = volume * 1e-12 * density; // grams
+                        masses.push(mass);
+                    }
+
+                    const iterMeanMass = masses.reduce((a, b) => a + b, 0) / masses.length;
+                    meanMassAccumulator += iterMeanMass;
+
+                    // Total Flux Estimate based on this iteration's mean mass
+                    // Flux (Mass) = TotalItems * MeanMass
+                    const totalItems = (window.COASTAL_DATA && window.COASTAL_DATA.total_items_yr) ? window.COASTAL_DATA.total_items_yr : 7.05e14;
+                    const fluxKt = (totalItems * iterMeanMass / 1000) / 1e6; // g -> kg -> kt
+                    fluxEstimates.push(fluxKt);
+
+                    if (iter === 0) allMasses = masses;
+                }
+
+                // Global Stats
+                const globalMeanMass = meanMassAccumulator / nIterations; // grams
+                const sortedFlux = fluxEstimates.sort((a, b) => a - b);
+                const p50Flux = sortedFlux[Math.floor(nIterations * 0.5)];
+
+                currentSimulationResult = {
+                    meanParticleMass: globalMeanMass, // grams
+                    fluxEstimates: sortedFlux.map(f => f * timeScalingFactor), // Scale final flux by time
+                    p50Flux: p50Flux * timeScalingFactor,
+                    sampleMasses: allMasses,
+                    params: { alpha, minSize, year: selectedYear, scaling: timeScalingFactor }
+                };
+
+                updateUI(currentSimulationResult);
+                updateMap(); // Redraw map with new mass values
+
+                document.getElementById('loading').style.display = 'none';
+            }, 50);
+        }
+
+        // --- 4. UI UPDATES ---
+        function updateUI(result) {
+            // Sidebar Values
+            document.getElementById('alphaValue').textContent = document.getElementById('alphaSlider').value;
+            document.getElementById('minSizeValue').textContent = document.getElementById('minSizeSlider').value;
+            document.getElementById('mcSamplesValue').textContent = document.getElementById('mcSamplesSlider').value;
+
+            // Results Panel
+            document.getElementById('resMeanMass').textContent = (result.meanParticleMass * 1e6).toFixed(3) + " μg"; // Display in micrograms
+            document.getElementById('resTotalFlux').textContent = result.p50Flux.toFixed(2) + " kt/yr";
+            document.getElementById('yearValue').textContent = result.params.year;
+
+            const totalItems = (window.COASTAL_DATA && window.COASTAL_DATA.total_items_yr) ? window.COASTAL_DATA.total_items_yr : 0;
+            // Scale item count too
+            const scaledTotalItems = totalItems * result.params.scaling;
+            document.getElementById('resTotalItems').textContent = scaledTotalItems.toExponential(2);
+
+            // Update Charts (Analysis Tab)
+            updateCharts(result);
+        }
+
+        function updateCharts(result) {
+            // 1. Size Distribution
+            const alpha = result.params.alpha;
+            const minSize = result.params.minSize;
+            const xSize = [];
+            const ySize = [];
+            for (let i = 0; i < 100; i++) {
+                const s = minSize * Math.pow(5000 / minSize, i / 99);
+                xSize.push(s);
+                ySize.push(Math.pow(s, -alpha));
+            }
+            Plotly.newPlot('sizeChart', [{
+                x: xSize, y: ySize, type: 'scatter', fill: 'tozeroy', line: { color: '#e74c3c' }
+            }], {
+                margin: { t: 20, b: 30, l: 40, r: 10 },
+                xaxis: { type: 'log', title: 'Size (μm)' },
+                yaxis: { title: 'Freq' }
+            }, { displayModeBar: false });
+
+            // 2. Convergence
+            Plotly.newPlot('convergenceChart', [{
+                y: result.fluxEstimates, type: 'scatter', mode: 'lines', line: { color: '#9b59b6' }
+            }], {
+                margin: { t: 20, b: 30, l: 40, r: 10 },
+                yaxis: { title: 'Mass Flux (kt)' },
+                xaxis: { title: 'Sorted Iterations' }
+            }, { displayModeBar: false });
+
+            // 3. Mass Histogram
+            const logMasses = result.sampleMasses.map(m => Math.log10(m * 1000)); // log mg
+            Plotly.newPlot('massChart', [{
+                x: logMasses, type: 'histogram', marker: { color: '#3498db' }
+            }], {
+                margin: { t: 20, b: 30, l: 40, r: 10 },
+                xaxis: { title: 'Log10(mg)' }
+            }, { displayModeBar: false });
+
+            // 4. Polymer (Static)
+            const polyData = [{
+                x: Object.keys(POLYMER_PROBS),
+                y: Object.values(POLYMER_PROBS),
+                type: 'bar',
+                marker: { color: '#2ecc71' }
+            }];
+            Plotly.newPlot('polymerChart', polyData, {
+                margin: { t: 20, b: 30, l: 40, r: 10 }
+            }, { displayModeBar: false });
+            Plotly.newPlot('polymerChart', polyData, {
+                margin: { t: 20, b: 30, l: 40, r: 10 }
+            }, { displayModeBar: false });
+
+            // 5. Temporal Trend
+            plotTemporalTrend(result.p50Flux, result.params.year, result.params.scaling);
+        }
+
+        function plotTemporalTrend(currentFlux, currentYear, currentScaling) {
+            // Plot curve from 2010 to 2025
+            const years = [];
+            const fluxes = [];
+            // Unscale to get base flux
+            const baseFlux = currentFlux / currentScaling;
+
+            for (let y = 2010; y <= 2025; y++) {
+                years.push(y);
+                const factor = Math.pow(2, (y - BASE_YEAR) / DOUBLING_TIME);
+                fluxes.push(baseFlux * factor);
+            }
+
+            const trace = {
+                x: years,
+                y: fluxes,
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: { shape: 'spline', color: '#e67e22', width: 3 },
+                name: 'Trend'
+            };
+
+            const point = {
+                x: [currentYear],
+                y: [currentFlux],
+                type: 'scatter',
+                mode: 'markers',
+                marker: { size: 12, color: '#c0392b', line: { color: 'white', width: 2 } },
+                name: 'Selected Year'
+            };
+
+            const layout = {
+                margin: { t: 20, b: 40, l: 50, r: 20 },
+                xaxis: { title: 'Year', gridcolor: '#eee' },
+                yaxis: { title: 'Total Mass Flux (kt/yr)', gridcolor: '#eee' },
+                showlegend: false,
+                hovermode: 'x unified'
+            };
+
+            Plotly.newPlot('trendChart', [trace, point], layout, { displayModeBar: false });
+        }
+
+
+        // --- 5. MAP IMPLEMENTATION ---
+        function initMap() {
+            map = L.map('map').setView([20, 0], 2);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO'
+            }).addTo(map);
+
+            // Legend
+            legend = L.control({ position: 'bottomright' });
+            legend.onAdd = function (map) {
+                const div = L.DomUtil.create('div', 'info legend');
+                div.innerHTML = "<h4>Legend</h4><div id='legendContent'></div>";
+                return div;
+            };
+            legend.addTo(map);
+
+            // Add scale
+            L.control.scale().addTo(map);
+        }
+
+        function updateMap() {
+            if (!map || !window.COASTAL_DATA) return;
+            if (mapLayer) map.removeLayer(mapLayer);
+
+            const metric = document.getElementById('mapMetricSelect').value;
+            const radiusScale = parseFloat(document.getElementById('mapRadiusSlider').value);
+            const basins = window.COASTAL_DATA.basins;
+
+            document.getElementById('mapCount').textContent = basins.length;
+
+            // Prepare data points
+            const points = basins.map(b => {
+                let val;
+                // Apply Time Scaling scaling to both metrics (items and mass)
+                const scaling = currentSimulationResult ? currentSimulationResult.params.scaling : 1.0;
+
+                if (metric === 'items') {
+                    val = b.flux_items * scaling; // Scaled Items/yr
+                } else {
+                    // Mass Flux Calculation: Items * MeanMass(g) * 1e-9 (kt conversion) * TimeScaling
+                    // currentSimulationResult.meanParticleMass is already computed? No, P50 was scaled.
+                    // Let's use the raw MeanMass and apply scaling explicitly for clarity.
+                    const meanMass = currentSimulationResult ? currentSimulationResult.meanParticleMass : 0;
+                    val = b.flux_items * meanMass * 1e-9 * scaling; // kt/yr
+                }
+                return { lat: b.lat, lon: b.lon, val: val, id: b.id };
+            });
+
+            // Colors
+            // Log scale for coloring
+            const vals = points.map(p => p.val).filter(v => v > 0);
+            const minVal = Math.min(...vals);
+            const maxVal = Math.max(...vals);
+
+            function getColor(v) {
+                if (v <= 0) return '#ccc';
+                // Simple Traffic Light: Green -> Yellow -> Red
+                // Log normalization
+                const logMin = Math.log10(minVal);
+                const logMax = Math.log10(maxVal);
+                const logV = Math.log10(v);
+                const t = (logV - logMin) / (logMax - logMin || 1);
+
+                // Color interpolation (0=Green, 0.5=Yellow, 1=Red)
+                // HSL: Green(120) -> Red(0)
+                const hue = 120 * (1 - t);
+                return `hsl(${hue}, 100%, 45%)`;
+            }
+
+            mapLayer = L.layerGroup();
+
+            points.forEach(p => {
+                if (p.val > 0) {
+                    L.circleMarker([p.lat, p.lon], {
+                        radius: 2 * radiusScale,
+                        fillColor: getColor(p.val),
+                        color: "#000",
+                        weight: 0.5,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).bindPopup(`
+                        <b>Basin ID:</b> ${p.id}<br>
+                        <b>${metric === 'mass' ? 'Mass Flux' : 'Item Flux'}:</b> 
+                        ${p.val.toExponential(2)} ${metric === 'mass' ? 'kt/yr' : 'items/yr'}
+                    `).addTo(mapLayer);
+                }
+            });
+
+            mapLayer.addTo(map);
+            updateLegend(metric, minVal, maxVal);
+        }
+
+        function updateLegend(metric, min, max) {
+            const div = document.getElementById('legendContent');
+            if (!div) return;
+            const unit = metric === 'mass' ? 'kt/yr' : 'items/yr';
+
+            // Create a gradient bar representation
+            let html = `<div style="margin-bottom:5px; font-weight:bold;">${metric === 'mass' ? 'Mass Flux' : 'Item Abundance'}</div>`;
+            html += `<div style="background: linear-gradient(to right, hsl(120,100%,45%), hsl(60,100%,45%), hsl(0,100%,45%)); height:10px; width:100%; margin-bottom:5px;"></div>`;
+            html += `<div style="display:flex; justify-content:space-between; font-size:0.8em;">
+                <span>${min.toExponential(1)}</span>
+                <span>${max.toExponential(1)}</span>
+            </div>`;
+            html += `<div style="text-align:center; font-size:0.8em; color:#777;">(${unit}, Log Scale)</div>`;
+
+            div.innerHTML = html;
+        }
+
+
+        // --- 6. INITIALIZATION & EVENTS ---
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            // Find button with onclick matching this tab
+            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+            if (btn) btn.classList.add('active');
+
+            document.getElementById('tab-' + tabId).classList.add('active');
+
+            // If mapping tab, invalidate size to fix leaflet rendering
+            if (tabId === 'map' && map) {
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+        }
+
+        function applyPreset(name) {
+            const p = PRESETS[name];
+            document.getElementById('alphaSlider').value = p.alpha;
+            document.getElementById('minSizeSlider').value = p.minSize;
+            document.getElementById('mcSamplesSlider').value = p.mcSamples;
+            runSimulation();
+        }
+
+        // Listeners
+        document.getElementById('alphaSlider').addEventListener('change', runSimulation);
+        document.getElementById('minSizeSlider').addEventListener('change', runSimulation);
+        document.getElementById('mcSamplesSlider').addEventListener('change', runSimulation);
+        document.getElementById('yearSlider').addEventListener('input', runSimulation); // Real-time input for smooth slider
+
+        document.getElementById('mapMetricSelect').addEventListener('change', updateMap);
+        document.getElementById('mapRadiusSlider').addEventListener('input', updateMap);
+
+        // Init
+        window.onload = function () {
+            initMap();
+            runSimulation(); // Initial Run
+        };
+
+    </script>
+</body>
+
+</html>
