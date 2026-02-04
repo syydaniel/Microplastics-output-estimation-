@@ -75,17 +75,24 @@ def load_and_process():
     joined = gpd.sjoin(gdf_flux, gdf_ddm30[['Basin_ID', 'Basin_name', 'geometry']], how="inner", predicate="within")
     print(f"  - Joined Records: {len(joined)}")
     
-    # 7. Aggregate: Select Representative Outlet per DDM30 Basin
-    print("Aggregating to DDM30 (Selecting Outlet)...")
-    # For each DDM30 Basin_ID, select the Lev12 subbasin with Max Discharge
+    # 7. Aggregate: Sum all Level 12 basins within each DDM30 basin
+    print("Aggregating to DDM30 (Summing all basins within each DDM30 polygon)...")
     
-    # Sort by Discharge descending
-    joined_sorted = joined.sort_values(by='Natural_Discharge_Upstream', ascending=False)
+    # Group by Basin_ID and sum the flux values
+    aggregated = joined.groupby('Basin_ID').agg({
+        'Flux_Linear': 'sum',  # Sum all items flux
+        'Natural_Discharge_Upstream': 'sum',  # Sum discharge (or could use max)
+        'Basin_name': 'first',  # Keep first name
+        'centroid': 'first'  # Keep first centroid (will use DDM30 mouth coords later)
+    }).reset_index()
     
-    # Drop duplicates on Basin_ID, keeping first (which is Max Discharge)
-    ddm30_aggregated = joined_sorted.drop_duplicates(subset=['Basin_ID'], keep='first')
+    # Calculate aggregated coordinates (use centroid of first basin, but will override with DDM30 mouth)
+    aggregated['lat'] = aggregated['centroid'].apply(lambda p: p.y if p else None)
+    aggregated['lon'] = aggregated['centroid'].apply(lambda p: p.x if p else None)
     
-    print(f"  - Aggregated DDM30 Basins: {len(ddm30_aggregated)}")
+    print(f"  - Aggregated DDM30 Basins: {len(aggregated)}")
+    print(f"  - Total Level 12 basins used: {len(joined)}")
+    print(f"  - Average basins per DDM30: {len(joined)/len(aggregated):.1f}")
     
     # 8. Load DDM30 CSV for Filters and correct Mouth Coordinates
     print(f"Reading DDM30 Metadata: {CSV_DDM30_PATH}")
@@ -98,7 +105,7 @@ def load_and_process():
             df_ddm30_meta = pd.read_csv(CSV_DDM30_PATH, encoding='utf-8')
     
     import sys
-    print("Aggregated Columns:", ddm30_aggregated.columns.tolist())
+    print("Aggregated Columns:", aggregated.columns.tolist())
     sys.stdout.flush()
     
     # Clean CSV columns
@@ -125,7 +132,7 @@ def load_and_process():
 
     # Merge aggregated flux with DDM30 metadata (Coordinates, Filtering info)
     # We prefer Lat_mouth/Lon_mouth from DDM30 meta over the Lev12 centroid
-    final_df = pd.merge(ddm30_aggregated, df_ddm30_meta, on='Basin_ID', how='inner', suffixes=('_lev12', '_ddm30'))
+    final_df = pd.merge(aggregated, df_ddm30_meta, on='Basin_ID', how='inner', suffixes=('_lev12', '_ddm30'))
     
     # 9. Apply Filters
     # "filter should also be appied by using ddm30 related file"
@@ -140,9 +147,9 @@ def load_and_process():
     print("Exporting to JS...")
     
     output_data = {
-        "source": "DDM30 Aggregated (Max Discharge Outlet)",
+        "source": "DDM30 Aggregated (Sum of all Lev12 basins within each DDM30)",
         "total_basins": len(final_df),
-        "total_items_yr": final_df['Flux_Linear'].sum(), # Sum of the outlets' flux
+        "total_items_yr": final_df['Flux_Linear'].sum(),
         "basins": []
     }
     
